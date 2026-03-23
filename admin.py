@@ -87,6 +87,8 @@ def pager(current, total, per_page, base_url):
 if mode == "create_db":
     new = safe(getv("new_db"))
     if new:
+        if not new.endswith(".db"):
+            new = new + ".db"
         sqlite3.connect(db_path(new)).close()
 
 if mode == "create_table" and db:
