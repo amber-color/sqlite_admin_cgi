@@ -368,182 +368,6 @@ if mode == "execute_sql" and db:
 # -----------------
 # HTML
 # -----------------
-CSS_STYLES = """
-/* ── Base ── */
-*, *::before, *::after { box-sizing: border-box; }
-body {
-  background: #f5f5f7;
-  color: #1d1d1f;
-  font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
-  font-size: .875rem;
-  margin: 0; padding: 0;
-}
-
-/* ── App shell ── */
-#app-shell {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 1.25rem 1.5rem;
-}
-
-/* ── Header ── */
-#app-header {
-  display: flex;
-  align-items: center;
-  padding-bottom: .75rem;
-  margin-bottom: 1rem;
-  border-bottom: 1px solid #d2d2d7;
-}
-#app-header h3 {
-  font-size: 1rem;
-  font-weight: 600;
-  color: #1d1d1f;
-  letter-spacing: -.015em;
-  margin: 0;
-}
-
-/* ── Topbar ── */
-#topbar {
-  background: #ffffff;
-  border: 1px solid #d2d2d7;
-  border-radius: .625rem;
-  padding: .625rem .875rem;
-  margin-bottom: 1rem;
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: .5rem;
-}
-#topbar label { font-size: .8125rem; color: #6e6e73; margin: 0 .25rem 0 0; }
-#topbar .form-control {
-  background: #f5f5f7;
-  border: 1px solid #d2d2d7;
-  border-radius: .375rem;
-  font-size: .8125rem;
-  height: auto;
-  padding: .3rem .55rem;
-}
-#topbar .form-control:focus { border-color: #0071e3; box-shadow: none; outline: none; }
-#topbar .btn { font-size: .8125rem; padding: .3rem .75rem; }
-
-/* ── Main layout ── */
-#main-layout { display: flex; align-items: flex-start; gap: .875rem; }
-
-/* ── Sidebar ── */
-#sidebar {
-  flex-shrink: 0;
-  width: 88px;
-  background: #ffffff;
-  border: 1px solid #d2d2d7;
-  border-radius: .625rem;
-  padding: .375rem;
-}
-#sidebar .nav-link {
-  display: block;
-  color: #3c3c43;
-  border-radius: .375rem;
-  padding: .45rem .5rem;
-  font-size: .8125rem;
-  font-weight: 500;
-  text-align: center;
-  white-space: nowrap;
-  text-decoration: none;
-}
-#sidebar .nav-link:hover { background: #f0f0f5; color: #1d1d1f; }
-#sidebar .nav-link.active {
-  background: #0071e3;
-  color: #ffffff;
-  font-weight: 600;
-}
-
-/* ── Content panel ── */
-#content {
-  flex: 1 1 0;
-  background: #ffffff;
-  border: 1px solid #d2d2d7;
-  border-radius: .625rem;
-  padding: 1.25rem 1.5rem;
-  min-height: 360px;
-  min-width: 0;
-}
-
-/* ── Tab pane headings ── */
-.tab-pane h5 {
-  font-size: .75rem;
-  font-weight: 700;
-  color: #6e6e73;
-  text-transform: uppercase;
-  letter-spacing: .07em;
-  margin-bottom: .875rem;
-  padding-bottom: .4rem;
-  border-bottom: 1px solid #e8e8ed;
-}
-.tab-pane hr { border: none; border-top: 1px solid #e8e8ed; margin: 1.25rem 0; }
-
-/* ── Tables ── */
-.table { font-size: .79rem; }
-.table thead th {
-  background: #f5f5f7;
-  color: #6e6e73;
-  font-size: .69rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: .06em;
-  border-top: none;
-  border-bottom: 1px solid #d2d2d7 !important;
-}
-.table td, .table th { border-color: #e8e8ed; vertical-align: middle; }
-.table-bordered { border-color: #e8e8ed; }
-
-/* ── Forms ── */
-.form-control {
-  border-color: #d2d2d7;
-  border-radius: .375rem;
-  font-size: .8125rem;
-}
-.form-control:focus {
-  border-color: #0071e3;
-  box-shadow: 0 0 0 3px rgba(0,113,227,.12);
-}
-
-/* ── Buttons ── */
-.btn { border-radius: .375rem; font-size: .8125rem; font-weight: 500; }
-.btn-primary  { background: #0071e3; border-color: #0071e3; }
-.btn-primary:hover  { background: #005ec4; border-color: #005ec4; color: #fff; }
-.btn-success  { background: #28a745; border-color: #28a745; color: #fff; }
-.btn-success:hover  { background: #1e8035; border-color: #1e8035; color: #fff; }
-.btn-warning  { background: #ff9500; border-color: #ff9500; color: #fff; }
-.btn-warning:hover  { background: #e08300; border-color: #e08300; color: #fff; }
-.btn-danger   { background: #ff3b30; border-color: #ff3b30; }
-.btn-danger:hover   { background: #d42b22; border-color: #d42b22; color: #fff; }
-.btn-outline-secondary { border-color: #d2d2d7; color: #3c3c43; background: #fff; }
-.btn-outline-secondary:hover { background: #f0f0f5; border-color: #c7c7cc; color: #1d1d1f; }
-.btn-outline-danger { border-color: #ff3b30; color: #ff3b30; }
-.btn-outline-danger:hover { background: #ff3b30; color: #fff; border-color: #ff3b30; }
-
-/* ── Alerts ── */
-.alert { border-radius: .5rem; font-size: .8125rem; }
-.alert-success { background: #f0faf3; border-color: #a8dab5; color: #1a5c2e; }
-.alert-danger  { background: #fff5f5; border-color: #f5b7b1; color: #7b1f1a; }
-
-/* ── Pagination ── */
-.page-link { color: #0071e3; border-color: #d2d2d7; font-size: .75rem; padding: .3rem .6rem; }
-.page-item.active .page-link { background: #0071e3; border-color: #0071e3; }
-.page-item.disabled .page-link { color: #c7c7cc; }
-
-/* ── CodeMirror ── */
-.CodeMirror {
-  height: 200px;
-  border: 1px solid #d2d2d7;
-  border-radius: .375rem;
-  font-size: 12.5px;
-  font-family: "SF Mono", "Menlo", "Monaco", monospace;
-}
-
-/* ── Search highlight ── */
-span[style*="color:red"] { color: #ff3b30 !important; font-weight: 600; }
-"""
-
 conn = None
 cols = []
 cur = None
@@ -566,18 +390,17 @@ href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
 <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.2/dist/js/bootstrap.bundle.min.js"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
-<style>{CSS_STYLES}</style>
+<style>.CodeMirror{{ height:180px; border:1px solid #ced4da; border-radius:.25rem; font-size:13px; }}</style>
 
 </head>
-<body>
-<div id="app-shell">
+<body class="p-3">
 
-<div id="app-header"><h3>SQLite Admin</h3></div>
+<h3>SQLite Admin</h3>
 
-<div id="topbar">
+<div class="d-flex align-items-center flex-wrap mb-3" style="gap:.5rem">
 <form method="get" class="form-inline">
-<label>DB</label>
-<select name="db" onchange="this.form.submit()" class="form-control form-control-sm mr-3">
+DB:
+<select name="db" onchange="this.form.submit()" class="form-control form-control-sm ml-1 mr-3">
 <option value="">--</option>
 """)
 
@@ -588,7 +411,7 @@ for d in get_dbs():
 print("""
 </select>
 
-<label>テーブル</label>
+テーブル:
 <select name="table" onchange="this.form.submit()" class="form-control form-control-sm ml-1">
 <option value="">--</option>
 """)
@@ -609,18 +432,18 @@ print(f"""
 </form>
 </div>
 
-<div id="main-layout">
+<div class="d-flex align-items-start">
 
-<nav id="sidebar" class="nav flex-column">
-<a class="nav-link {'active' if tab=='create' else ''}" href="?db={db or ''}&table={table or ''}&tab=create">作成</a>
-<a class="nav-link {'active' if tab=='insert' else ''}" href="?db={db or ''}&table={table or ''}&tab=insert">追加</a>
-<a class="nav-link {'active' if tab=='list' else ''}" href="?db={db or ''}&table={table or ''}&tab=list">一覧</a>
-<a class="nav-link {'active' if tab=='edit' else ''}" href="?db={db or ''}&table={table or ''}&tab=edit">編集</a>
-<a class="nav-link {'active' if tab=='search' else ''}" href="?db={db or ''}&table={table or ''}&tab=search">検索</a>
-<a class="nav-link {'active' if tab=='sql' else ''}" href="?db={db or ''}&table={table or ''}&tab=sql">SQL</a>
-</nav>
+<ul class="nav nav-pills flex-column flex-shrink-0 mr-3" style="width:90px;min-width:90px">
+<li class="nav-item"><a class="nav-link {'active' if tab=='create' else ''}" href="?db={db or ''}&table={table or ''}&tab=create">作成</a></li>
+<li class="nav-item"><a class="nav-link {'active' if tab=='insert' else ''}" href="?db={db or ''}&table={table or ''}&tab=insert">追加</a></li>
+<li class="nav-item"><a class="nav-link {'active' if tab=='list' else ''}" href="?db={db or ''}&table={table or ''}&tab=list">一覧</a></li>
+<li class="nav-item"><a class="nav-link {'active' if tab=='edit' else ''}" href="?db={db or ''}&table={table or ''}&tab=edit">編集</a></li>
+<li class="nav-item"><a class="nav-link {'active' if tab=='search' else ''}" href="?db={db or ''}&table={table or ''}&tab=search">検索</a></li>
+<li class="nav-item"><a class="nav-link {'active' if tab=='sql' else ''}" href="?db={db or ''}&table={table or ''}&tab=sql">SQL</a></li>
+</ul>
 
-<div id="content" class="tab-content">
+<div class="tab-content flex-grow-1">
 """)
 
 # -----------------
@@ -1080,4 +903,4 @@ if db:
 if conn:
     conn.close()
 
-print("</div></div></div></body></html>")
+print("</div></div></body></html>")
