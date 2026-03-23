@@ -223,9 +223,10 @@ href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
 
 <h3>SQLite Admin</h3>
 
-<form method="get" class="mb-3">
+<div class="d-flex align-items-center flex-wrap mb-3" style="gap:.5rem">
+<form method="get" class="form-inline">
 DB:
-<select name="db" onchange="this.form.submit()">
+<select name="db" onchange="this.form.submit()" class="form-control form-control-sm ml-1 mr-3">
 <option value="">--</option>
 """)
 
@@ -237,7 +238,7 @@ print("""
 </select>
 
 テーブル:
-<select name="table" onchange="this.form.submit()">
+<select name="table" onchange="this.form.submit()" class="form-control form-control-sm ml-1">
 <option value="">--</option>
 """)
 
@@ -249,6 +250,13 @@ if db:
 print(f"""
 </select>
 </form>
+
+<form method="get" class="form-inline">
+<input type="hidden" name="mode" value="create_db">
+<input name="new_db" class="form-control form-control-sm mr-1" placeholder="新しいDB名" style="width:150px">
+<button class="btn btn-sm btn-primary">DB作成</button>
+</form>
+</div>
 
 <ul class="nav nav-tabs">
 <li class="nav-item"><a class="nav-link {'active' if tab=='create' else ''}" href="?db={db or ''}&table={table or ''}&tab=create">作成</a></li>
@@ -265,13 +273,6 @@ print(f"""
 # -----------------
 print(f"""
 <div id="create" class="tab-pane fade {'show active' if tab=='create' else ''}">
-
-<h5>DB作成</h5>
-<form>
-<input type=hidden name=mode value=create_db>
-<input name=new_db class="form-control mb-2">
-<button class="btn btn-primary">作成</button>
-</form>
 
 <h5>テーブル作成</h5>
 <form>
