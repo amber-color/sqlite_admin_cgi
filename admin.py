@@ -70,6 +70,8 @@ tab = getv("tab") or "create"
 page = max(1, int(getv("page") or 1))
 search_kw   = getv("search_kw") or ""
 search_type = getv("search_type") or "partial"
+sql_text    = getv("sql_text") or ""
+sql_result  = None
 PAGE_LIST = 100
 PAGE_EDIT = 50
 
@@ -262,6 +264,25 @@ if mode == "csv_import" and db:
             conn.commit()
         conn.close()
 
+if mode == "execute_sql" and db:
+    _sql = sql_text.strip()
+    if _sql:
+        try:
+            _conn = sqlite3.connect(db_path(db))
+            _cur  = _conn.cursor()
+            _cur.execute(_sql)
+            if _cur.description:
+                _headers = [d[0] for d in _cur.description]
+                _rows    = _cur.fetchall()
+                sql_result = {"type": "rows", "headers": _headers, "rows": _rows}
+            else:
+                _conn.commit()
+                sql_result = {"type": "message",
+                              "msg": f"OK — {_cur.rowcount} 行に影響しました"}
+            _conn.close()
+        except Exception as _e:
+            sql_result = {"type": "error", "msg": str(_e)}
+
 # -----------------
 # HTML
 # -----------------
@@ -286,6 +307,8 @@ href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
 
 <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.2/dist/js/bootstrap.bundle.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+<style>.CodeMirror{{ height:180px; border:1px solid #ced4da; border-radius:.25rem; font-size:13px; }}</style>
 
 </head>
 <body class="p-3">
@@ -333,6 +356,7 @@ print(f"""
 <li class="nav-item"><a class="nav-link {'active' if tab=='list' else ''}" href="?db={db or ''}&table={table or ''}&tab=list">一覧</a></li>
 <li class="nav-item"><a class="nav-link {'active' if tab=='edit' else ''}" href="?db={db or ''}&table={table or ''}&tab=edit">編集</a></li>
 <li class="nav-item"><a class="nav-link {'active' if tab=='search' else ''}" href="?db={db or ''}&table={table or ''}&tab=search">検索</a></li>
+<li class="nav-item"><a class="nav-link {'active' if tab=='sql' else ''}" href="?db={db or ''}&table={table or ''}&tab=sql">SQL</a></li>
 </ul>
 
 <div class="tab-content mt-3">
@@ -669,6 +693,72 @@ if db and table:
             print('</table></div>')
 
     print('</div>')
+
+# -----------------
+# SQL タブ
+# -----------------
+if db:
+    cls = "show active" if tab == "sql" else ""
+    print(f'''<div id="sql" class="tab-pane fade {cls}">
+<form method="post" id="sql_form">
+<input type=hidden name=db value="{db}">
+<input type=hidden name=table value="{table or ''}">
+<input type=hidden name=tab value="sql">
+<input type=hidden name=mode value=execute_sql>
+<textarea id="sql_editor" name="sql_text">{html.escape(sql_text)}</textarea>
+<div class="mt-2 mb-3">
+  <button class="btn btn-primary btn-sm">実行</button>
+  <span class="text-muted small ml-2">Ctrl+Enter でも実行</span>
+</div>
+</form>
+''')
+
+    if sql_result:
+        t = sql_result["type"]
+        if t == "error":
+            print(f'<div class="alert alert-danger py-2"><strong>エラー:</strong> {html.escape(sql_result["msg"])}</div>')
+        elif t == "message":
+            print(f'<div class="alert alert-success py-2">{html.escape(sql_result["msg"])}</div>')
+        elif t == "rows":
+            hdrs = sql_result["headers"]
+            rws  = sql_result["rows"]
+            print(f'<p class="text-muted small">{len(rws)} 件</p>')
+            print('<div class="table-responsive"><table class="table table-bordered table-sm">')
+            print('<tr>' + ''.join(f'<th>{html.escape(str(h))}</th>' for h in hdrs) + '</tr>')
+            for r in rws:
+                print('<tr>' + ''.join(
+                    f'<td>{html.escape(str(v))}</td>' if v is not None
+                    else '<td><em class="text-muted">NULL</em></td>'
+                    for v in r) + '</tr>')
+            print('</table></div>')
+
+    print(f'''<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/sql/sql.min.js"></script>
+<script>
+(function() {{
+  var ta = document.getElementById('sql_editor');
+  if (!ta) return;
+  var editor = CodeMirror.fromTextArea(ta, {{
+    mode: 'text/x-sql',
+    lineNumbers: true,
+    indentWithTabs: false,
+    smartIndent: true,
+    lineWrapping: true,
+    autofocus: {'true' if tab == 'sql' else 'false'},
+    extraKeys: {{
+      'Ctrl-Enter': function() {{
+        document.getElementById('sql_form').dispatchEvent(new Event('submit', {{bubbles:true}}));
+        document.getElementById('sql_form').submit();
+      }}
+    }}
+  }});
+  document.getElementById('sql_form').addEventListener('submit', function() {{
+    editor.save();
+  }});
+}})();
+</script>
+</div>
+''')
 
 if conn:
     conn.close()
