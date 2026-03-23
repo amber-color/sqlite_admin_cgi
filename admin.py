@@ -1,7 +1,7 @@
 #!/usr/local/bin/python3.7
 # -*- coding: utf-8 -*-
 
-import cgi, cgitb, sqlite3, os, html, csv, re
+import cgi, cgitb, sqlite3, os, html, csv, re, uuid, time
 cgitb.enable()
 
 print("Content-Type: text/html; charset=utf-8\n")
@@ -70,8 +70,9 @@ tab = getv("tab") or "create"
 page = max(1, int(getv("page") or 1))
 search_kw   = getv("search_kw") or ""
 search_type = getv("search_type") or "partial"
-sql_text    = getv("sql_text") or ""
-sql_result  = None
+sql_text       = getv("sql_text") or ""
+sql_result     = None
+csv_preview_data = None
 PAGE_LIST = 100
 PAGE_EDIT = 50
 
@@ -215,6 +216,87 @@ if mode and mode.startswith("update_") and db and table:
     cur.execute(sql, vals)
     conn.commit()
     conn.close()
+
+TMP_EXT = ".csv_tmp"
+
+def _csv_decode(raw):
+    for enc in ('utf-8-sig', 'cp932', 'utf-8', 'latin-1'):
+        try:
+            return raw.decode(enc)
+        except UnicodeDecodeError:
+            continue
+    return None
+
+def _csv_tmp_path(tid):
+    return os.path.join(base_dir, tid + TMP_EXT)
+
+def _csv_tmp_cleanup():
+    for f in os.listdir(base_dir):
+        if f.endswith(TMP_EXT):
+            fp = os.path.join(base_dir, f)
+            if time.time() - os.path.getmtime(fp) > 3600:
+                try: os.remove(fp)
+                except: pass
+
+if mode == "csv_preview" and db:
+    _csv_tmp_cleanup()
+    csvfile = form["csvfile"] if "csvfile" in form else None
+    if csvfile is not None and csvfile.filename:
+        raw = csvfile.file.read()
+        decoded = _csv_decode(raw)
+        if decoded:
+            tid = uuid.uuid4().hex[:16]
+            with open(_csv_tmp_path(tid), 'w', encoding='utf-8') as fh:
+                fh.write(decoded)
+            lines = decoded.splitlines()
+            reader = csv.reader(lines)
+            skip = bool(getv("skipheader"))
+            header_row = next(reader, None) if skip else None
+            preview = [r for _, r in zip(range(5), reader)]
+            n_cols = len(preview[0]) if preview else (len(header_row) if header_row else 0)
+            default_names = header_row if (header_row and len(header_row) == n_cols) \
+                            else [f"col{i}" for i in range(n_cols)]
+            csv_preview_data = {
+                "tid":        tid,
+                "n_cols":     n_cols,
+                "col_names":  default_names,
+                "preview":    preview,
+                "new_table":  safe(getv("new_table")) or "",
+                "skipheader": "1" if skip else "",
+            }
+
+if mode == "csv_import_new" and db:
+    tid       = getv("tmp_id") or ""
+    new_tbl   = safe(getv("new_table")) or ""
+    skip      = bool(getv("skipheader_val"))
+    col_names = [n.strip() for n in form.getlist("col_name")]
+    col_types = form.getlist("col_type")
+    if tid and re.match(r'^[0-9a-f]{16}$', tid) and new_tbl and col_names:
+        tmp_path = _csv_tmp_path(tid)
+        if os.path.exists(tmp_path):
+            with open(tmp_path, encoding='utf-8') as fh:
+                lines = fh.read().splitlines()
+            reader = csv.reader(lines)
+            if skip:
+                next(reader, None)
+            rows = list(reader)
+            if rows:
+                col_defs = [f'"{n}" {t}' for n, t in zip(col_names, col_types) if n]
+                conn_c = sqlite3.connect(db_path(db))
+                try:
+                    conn_c.execute(f'CREATE TABLE "{new_tbl}" ({",".join(col_defs)})')
+                    for row in rows:
+                        if len(row) == len(col_names):
+                            conn_c.execute(
+                                f'INSERT INTO "{new_tbl}" VALUES ({",".join(["?"]*len(col_names))})',
+                                row)
+                    conn_c.commit()
+                except Exception:
+                    pass
+                finally:
+                    conn_c.close()
+            try: os.remove(tmp_path)
+            except: pass
 
 if mode == "csv_import" and db:
     target = getv("target")
@@ -673,8 +755,9 @@ print(f'''
 
 <form id="csvform" method="post" enctype="multipart/form-data">
 
-<input type="hidden" name="mode" value="csv_import">
+<input type="hidden" name="mode" id="csv_mode" value="csv_import">
 <input type="hidden" name="db" value="{db or ''}">
+<input type="hidden" name="tab" value="create">
 
 CSVファイル:
 <input type="file" name="csvfile" class="form-control mb-2">
@@ -695,17 +778,17 @@ CSVファイル:
 <label><input type="checkbox" name="append" checked> 末尾に追加</label><br>
 <label><input type="checkbox" name="truncate"> 既存削除して追加</label><br>
 <label><input type="checkbox" name="skipdup"> 重複スキップ</label><br>
-<label><input type="checkbox" name="skipheader" checked> 1行目スキップ</label>
+<label><input type="checkbox" name="skipheader" id="skipheader_existing" checked> 1行目スキップ</label>
 </div>
 
 <div id="sec_new" style="display:none;">
 <h6>新規テーブル設定</h6>
 テーブル名:
-<input name="new_table" class="form-control mb-2">
-<label><input type="checkbox" name="skipheader" checked> 1行目スキップ</label>
+<input name="new_table" class="form-control mb-2" placeholder="テーブル名">
+<label><input type="checkbox" name="skipheader" id="skipheader_new" checked> 1行目スキップ（ヘッダ行をカラム名に使用）</label>
 </div>
 
-<button class="btn btn-primary mt-2">インポート</button>
+<button class="btn btn-primary mt-2" id="csv_submit_btn">インポート</button>
 
 </form>
 
@@ -722,12 +805,53 @@ function csvTargetChange() {{
   var v = document.getElementById('csv_target').value;
   document.getElementById('sec_existing').style.display = v === 'existing' ? '' : 'none';
   document.getElementById('sec_new').style.display      = v === 'new'      ? '' : 'none';
+  document.getElementById('csv_submit_btn').textContent =
+    v === 'new' ? '次へ（カラム設定）→' : 'インポート';
+  document.getElementById('csv_mode').value =
+    v === 'new' ? 'csv_preview' : 'csv_import';
 }}
 document.getElementById('csvform').onsubmit = function() {{
   document.getElementById('progress').style.display = 'block';
 }}
 </script>
 ''')
+
+if csv_preview_data:
+    pd = csv_preview_data
+    print(f'''
+<hr>
+<h5>カラム設定 <small class="text-muted">— {html.escape(pd["new_table"])}</small></h5>
+<form method="post">
+<input type="hidden" name="mode"         value="csv_import_new">
+<input type="hidden" name="db"           value="{db or ''}">
+<input type="hidden" name="tab"          value="create">
+<input type="hidden" name="new_table"    value="{html.escape(pd["new_table"])}">
+<input type="hidden" name="tmp_id"       value="{pd["tid"]}">
+<input type="hidden" name="skipheader_val" value="{pd["skipheader"]}">
+''')
+    print('<div class="table-responsive"><table class="table table-bordered table-sm">')
+    print('<thead class="thead-light"><tr>')
+    for i in range(pd["n_cols"]):
+        print(f'<th>カラム {i+1}</th>')
+    print('</tr>')
+    print('<tr>')
+    for i in range(pd["n_cols"]):
+        nm = html.escape(pd["col_names"][i]) if i < len(pd["col_names"]) else f"col{i}"
+        print(f'<td><input name="col_name" value="{nm}" class="form-control form-control-sm mb-1" placeholder="カラム名"></td>')
+    print('</tr><tr>')
+    for i in range(pd["n_cols"]):
+        print(f'''<td><select name="col_type" class="form-control form-control-sm">
+<option>TEXT</option><option>INTEGER</option><option>REAL</option><option>BLOB</option>
+</select></td>''')
+    print('</tr></thead>')
+    if pd["preview"]:
+        print('<tbody>')
+        for row in pd["preview"]:
+            print('<tr>' + ''.join(f'<td class="text-muted small">{html.escape(str(v))}</td>' for v in row) + '</tr>')
+        print('</tbody>')
+    print('</table></div>')
+    print(f'<p class="text-muted small">↑ プレビュー（最大5行）</p>')
+    print('<button class="btn btn-success">インポート実行</button></form>')
 
 print('</div>')
 
