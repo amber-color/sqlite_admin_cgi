@@ -432,9 +432,7 @@ print(f"""
 </form>
 </div>
 
-<div class="d-flex align-items-start">
-
-<ul class="nav nav-pills flex-column flex-shrink-0 mr-3" style="width:90px;min-width:90px">
+<ul class="nav nav-tabs">
 <li class="nav-item"><a class="nav-link {'active' if tab=='create' else ''}" href="?db={db or ''}&table={table or ''}&tab=create">作成</a></li>
 <li class="nav-item"><a class="nav-link {'active' if tab=='insert' else ''}" href="?db={db or ''}&table={table or ''}&tab=insert">追加</a></li>
 <li class="nav-item"><a class="nav-link {'active' if tab=='list' else ''}" href="?db={db or ''}&table={table or ''}&tab=list">一覧</a></li>
@@ -443,7 +441,7 @@ print(f"""
 <li class="nav-item"><a class="nav-link {'active' if tab=='sql' else ''}" href="?db={db or ''}&table={table or ''}&tab=sql">SQL</a></li>
 </ul>
 
-<div class="tab-content flex-grow-1">
+<div class="tab-content mt-3">
 """)
 
 # -----------------
@@ -903,4 +901,4 @@ if db:
 if conn:
     conn.close()
 
-print("</div></div></body></html>")
+print("</div></body></html>")
