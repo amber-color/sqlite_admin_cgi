@@ -17,4 +17,4 @@ jobs:
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
           local-dir: ./ # ローカルのどのフォルダをアップするか
-          server-dir: /www/sqlite_admin_cgi/ # ロリポップ側のアップロード先
+          server-dir: /sqlite_admin_cgi/ # ロリポップ側のアップロード先

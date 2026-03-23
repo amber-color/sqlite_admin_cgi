@@ -253,7 +253,6 @@ print(f"""
 <li class="nav-item"><a class="nav-link {'active' if tab=='insert' else ''}" href="?db={db or ''}&table={table or ''}&tab=insert">追加</a></li>
 <li class="nav-item"><a class="nav-link {'active' if tab=='list' else ''}" href="?db={db or ''}&table={table or ''}&tab=list">一覧</a></li>
 <li class="nav-item"><a class="nav-link {'active' if tab=='edit' else ''}" href="?db={db or ''}&table={table or ''}&tab=edit">編集</a></li>
-<li class="nav-item"><a class="nav-link {'active' if tab=='csv' else ''}" href="?db={db or ''}&table={table or ''}&tab=csv">CSV取込</a></li>
 </ul>
 
 <div class="tab-content mt-3">
@@ -294,7 +293,80 @@ for i in range(5):
     </div>
     """)
 
-print('<button class="btn btn-success">作成</button></form></div>')
+print('<button class="btn btn-success">作成</button></form>')
+
+# -----------------
+# 作成タブ内 CSVインポート
+# -----------------
+csv_table_options = ""
+if db:
+    for t in get_tables(db):
+        sel = "selected" if t == table else ""
+        csv_table_options += f'<option value="{t}" {sel}>{t}</option>'
+
+print(f'''
+<hr>
+<h5>CSVインポート</h5>
+
+<form id="csvform" method="post" enctype="multipart/form-data">
+
+<input type="hidden" name="mode" value="csv_import">
+<input type="hidden" name="db" value="{db or ''}">
+
+CSVファイル:
+<input type="file" name="csvfile" class="form-control mb-2">
+
+<h6>取り込み先</h6>
+<select name="target" id="csv_target" class="form-control mb-2" onchange="csvTargetChange()">
+<option value="existing">既存テーブル</option>
+<option value="new">新規テーブル</option>
+</select>
+
+<div id="sec_existing">
+<h6>既存テーブル設定</h6>
+テーブル名:
+<select name="table" class="form-control mb-2">
+<option value="">--</option>
+{csv_table_options}
+</select>
+<label><input type="checkbox" name="append" checked> 末尾に追加</label><br>
+<label><input type="checkbox" name="truncate"> 既存削除して追加</label><br>
+<label><input type="checkbox" name="skipdup"> 重複スキップ</label><br>
+<label><input type="checkbox" name="skipheader" checked> 1行目スキップ</label>
+</div>
+
+<div id="sec_new" style="display:none;">
+<h6>新規テーブル設定</h6>
+テーブル名:
+<input name="new_table" class="form-control mb-2">
+<label><input type="checkbox" name="skipheader" checked> 1行目スキップ</label>
+</div>
+
+<button class="btn btn-primary mt-2">インポート</button>
+
+</form>
+
+<div id="progress" class="mt-3" style="display:none;">
+<div class="progress">
+<div class="progress-bar progress-bar-striped progress-bar-animated" style="width:100%">
+処理中...
+</div>
+</div>
+</div>
+
+<script>
+function csvTargetChange() {{
+  var v = document.getElementById('csv_target').value;
+  document.getElementById('sec_existing').style.display = v === 'existing' ? '' : 'none';
+  document.getElementById('sec_new').style.display      = v === 'new'      ? '' : 'none';
+}}
+document.getElementById('csvform').onsubmit = function() {{
+  document.getElementById('progress').style.display = 'block';
+}}
+</script>
+''')
+
+print('</div>')
 
 # -----------------
 # 追加
@@ -375,79 +447,5 @@ if db and table:
 
 if conn:
     conn.close()
-    
-# -----------------
-# csvインポート
-# -----------------
-csv_table_options = ""
-if db:
-    for t in get_tables(db):
-        sel = "selected" if t == table else ""
-        csv_table_options += f'<option value="{t}" {sel}>{t}</option>'
-
-print(f'''
-<div id="csv" class="tab-pane fade {'show active' if tab=='csv' else ''}">
-
-<h5>CSVインポート</h5>
-
-<form id="csvform" method="post" enctype="multipart/form-data">
-
-<input type="hidden" name="mode" value="csv_import">
-<input type="hidden" name="db" value="{db or ''}">
-
-CSVファイル:
-<input type="file" name="csvfile" class="form-control mb-2">
-
-<h6>取り込み先</h6>
-<select name="target" id="csv_target" class="form-control mb-2" onchange="csvTargetChange()">
-<option value="existing">既存テーブル</option>
-<option value="new">新規テーブル</option>
-</select>
-
-<div id="sec_existing">
-<h6>既存テーブル設定</h6>
-テーブル名:
-<select name="table" class="form-control mb-2">
-<option value="">--</option>
-{csv_table_options}
-</select>
-<label><input type="checkbox" name="append" checked> 末尾に追加</label><br>
-<label><input type="checkbox" name="truncate"> 既存削除して追加</label><br>
-<label><input type="checkbox" name="skipdup"> 重複スキップ</label><br>
-<label><input type="checkbox" name="skipheader" checked> 1行目スキップ</label>
-</div>
-
-<div id="sec_new" style="display:none;">
-<h6>新規テーブル設定</h6>
-テーブル名:
-<input name="new_table" class="form-control mb-2">
-<label><input type="checkbox" name="skipheader" checked> 1行目スキップ</label>
-</div>
-
-<button class="btn btn-primary mt-2">インポート</button>
-
-</form>
-
-<div id="progress" class="mt-3" style="display:none;">
-<div class="progress">
-<div class="progress-bar progress-bar-striped progress-bar-animated" style="width:100%">
-処理中...
-</div>
-</div>
-</div>
-
-<script>
-function csvTargetChange() {{
-  var v = document.getElementById('csv_target').value;
-  document.getElementById('sec_existing').style.display = v === 'existing' ? '' : 'none';
-  document.getElementById('sec_new').style.display      = v === 'new'      ? '' : 'none';
-}}
-document.getElementById('csvform').onsubmit = function() {{
-  document.getElementById('progress').style.display = 'block';
-}}
-</script>
-
-</div>
-''')
 
 print("</div></body></html>")
