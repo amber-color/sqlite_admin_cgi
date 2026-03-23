@@ -700,7 +700,7 @@ if db and table:
 if db:
     cls = "show active" if tab == "sql" else ""
     print(f'''<div id="sql" class="tab-pane fade {cls}">
-<form method="post" id="sql_form">
+<form method="get" id="sql_form">
 <input type=hidden name=db value="{db}">
 <input type=hidden name=table value="{table or ''}">
 <input type=hidden name=tab value="sql">
