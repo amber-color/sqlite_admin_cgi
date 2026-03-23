@@ -278,25 +278,46 @@ print(f"""
 <form>
 <input type=hidden name=mode value=create_table>
 <input type=hidden name=db value="{db or ''}">
-<input name=new_table class="form-control mb-2">
+<input name=new_table class="form-control mb-2" placeholder="テーブル名">
 
-""")
-
-for i in range(5):
-    print(f"""
-    <div class="form-inline mb-1">
-    <input name=col_name class="form-control mr-2">
-    <select name=col_type class="form-control">
-    <option>TEXT</option>
-    <option>INTEGER</option>
-    <option>REAL</option>
-    <option>BLOB</option>
-    <option>NULL</option>
+<div id="col_rows">
+  <div class="d-flex align-items-center mb-1">
+    <input name=col_name class="form-control form-control-sm mr-1" placeholder="カラム名" style="width:160px">
+    <select name=col_type class="form-control form-control-sm mr-1" style="width:110px">
+      <option>TEXT</option>
+      <option>INTEGER</option>
+      <option>REAL</option>
+      <option>BLOB</option>
+      <option>NULL</option>
     </select>
-    </div>
-    """)
+    <button type="button" class="btn btn-outline-danger btn-sm col-remove">✕</button>
+  </div>
+</div>
+<button type="button" class="btn btn-outline-secondary btn-sm mb-2" id="col_add">+ カラム追加</button><br>
+<button class="btn btn-success btn-sm">作成</button>
+</form>
 
-print('<button class="btn btn-success">作成</button></form>')
+<script>
+var colTemplate = '<div class="d-flex align-items-center mb-1">'
+  + '<input name=col_name class="form-control form-control-sm mr-1" placeholder="カラム名" style="width:160px">'
+  + '<select name=col_type class="form-control form-control-sm mr-1" style="width:110px">'
+  + '<option>TEXT</option><option>INTEGER</option><option>REAL</option><option>BLOB</option><option>NULL</option>'
+  + '</select>'
+  + '<button type="button" class="btn btn-outline-danger btn-sm col-remove">✕</button>'
+  + '</div>';
+document.getElementById('col_add').onclick = function() {{
+  var div = document.createElement('div');
+  div.innerHTML = colTemplate;
+  document.getElementById('col_rows').appendChild(div.firstChild);
+}};
+document.getElementById('col_rows').addEventListener('click', function(e) {{
+  if (e.target.classList.contains('col-remove')) {{
+    var rows = document.querySelectorAll('#col_rows > div');
+    if (rows.length > 1) e.target.closest('div').remove();
+  }}
+}});
+</script>
+""")
 
 # -----------------
 # 作成タブ内 CSVインポート
