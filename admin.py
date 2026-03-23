@@ -39,6 +39,27 @@ def get_cols(conn, table):
     cur.execute(f"PRAGMA table_info({table})")
     return [r[1] for r in cur.fetchall()]
 
+def highlight(val, kw, match_type="partial"):
+    s = str(val)
+    if not kw:
+        return html.escape(s)
+    if match_type == "exact":
+        if s == kw:
+            return f'<span style="color:red;font-weight:bold">{html.escape(s)}</span>'
+        return html.escape(s)
+    result = []
+    lower_s, lower_kw = s.lower(), kw.lower()
+    i = 0
+    while i < len(s):
+        pos = lower_s.find(lower_kw, i)
+        if pos == -1:
+            result.append(html.escape(s[i:]))
+            break
+        result.append(html.escape(s[i:pos]))
+        result.append(f'<span style="color:red;font-weight:bold">{html.escape(s[pos:pos+len(kw)])}</span>')
+        i = pos + len(kw)
+    return ''.join(result)
+
 # -----------------
 # params
 # -----------------
@@ -47,6 +68,8 @@ table = safe(getv("table"))
 mode = getv("mode")
 tab = getv("tab") or "create"
 page = max(1, int(getv("page") or 1))
+search_kw   = getv("search_kw") or ""
+search_type = getv("search_type") or "partial"
 PAGE_LIST = 100
 PAGE_EDIT = 50
 
@@ -309,6 +332,7 @@ print(f"""
 <li class="nav-item"><a class="nav-link {'active' if tab=='insert' else ''}" href="?db={db or ''}&table={table or ''}&tab=insert">追加</a></li>
 <li class="nav-item"><a class="nav-link {'active' if tab=='list' else ''}" href="?db={db or ''}&table={table or ''}&tab=list">一覧</a></li>
 <li class="nav-item"><a class="nav-link {'active' if tab=='edit' else ''}" href="?db={db or ''}&table={table or ''}&tab=edit">編集</a></li>
+<li class="nav-item"><a class="nav-link {'active' if tab=='search' else ''}" href="?db={db or ''}&table={table or ''}&tab=search">検索</a></li>
 </ul>
 
 <div class="tab-content mt-3">
@@ -580,6 +604,71 @@ if db and table:
     print("</table></div></form>")
     print(pager(page, total_edit, PAGE_EDIT, base_edit))
     print("</div>")
+
+# -----------------
+# 検索
+# -----------------
+if db and table:
+    cls = "show active" if tab == "search" else ""
+    st = search_type
+    print(f'''<div id="search" class="tab-pane fade {cls}">
+<form method="get" class="mb-3">
+<input type=hidden name=db value="{db}">
+<input type=hidden name=table value="{table}">
+<input type=hidden name=tab value="search">
+<div class="d-flex align-items-center flex-wrap" style="gap:.5rem">
+<input name="search_kw" value="{html.escape(search_kw)}" class="form-control form-control-sm" style="width:220px" placeholder="キーワード">
+<div>
+  <label class="form-check-label mr-2 ml-1">
+    <input class="form-check-input" type="radio" name="search_type" value="partial" {"checked" if st=="partial" else ""}> 部分一致
+  </label>
+  <label class="form-check-label mr-2">
+    <input class="form-check-input" type="radio" name="search_type" value="exact" {"checked" if st=="exact" else ""}> 完全一致
+  </label>
+  <label class="form-check-label mr-2">
+    <input class="form-check-input" type="radio" name="search_type" value="prefix" {"checked" if st=="prefix" else ""}> 前方一致
+  </label>
+  <label class="form-check-label mr-2">
+    <input class="form-check-input" type="radio" name="search_type" value="suffix" {"checked" if st=="suffix" else ""}> 後方一致
+  </label>
+</div>
+<button class="btn btn-primary btn-sm">検索</button>
+</div>
+</form>
+''')
+
+    if search_kw:
+        if search_type == "exact":
+            pattern, op = search_kw, "="
+        elif search_type == "prefix":
+            pattern, op = search_kw + "%", "LIKE"
+        elif search_type == "suffix":
+            pattern, op = "%" + search_kw, "LIKE"
+        else:
+            pattern, op = "%" + search_kw + "%", "LIKE"
+
+        conditions = " OR ".join([f'CAST("{c}" AS TEXT) {op} ?' for c in cols])
+        hits = conn.execute(
+            f'SELECT rowid,* FROM "{table}" WHERE {conditions}',
+            [pattern] * len(cols)
+        ).fetchall()
+
+        print(f'<p class="text-muted small">{len(hits)}件ヒット</p>')
+        if hits:
+            print('<div class="table-responsive"><table class="table table-bordered table-sm">')
+            print('<tr><th>rowid</th>')
+            for c in cols:
+                print(f'<th>{html.escape(c)}</th>')
+            print('</tr>')
+            for r in hits:
+                print('<tr>')
+                print(f'<td>{r[0]}</td>')
+                for v in r[1:]:
+                    print(f'<td>{highlight(v, search_kw, search_type)}</td>')
+                print('</tr>')
+            print('</table></div>')
+
+    print('</div>')
 
 if conn:
     conn.close()
