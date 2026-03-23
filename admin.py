@@ -642,18 +642,18 @@ if db and table:
 <input type=hidden name=tab value="search">
 <div class="d-flex align-items-center flex-wrap" style="gap:.5rem">
 <input name="search_kw" value="{html.escape(search_kw)}" class="form-control form-control-sm" style="width:220px" placeholder="キーワード">
-<div>
-  <label class="form-check-label mr-2 ml-1">
-    <input class="form-check-input" type="radio" name="search_type" value="partial" {"checked" if st=="partial" else ""}> 部分一致
+<div class="d-flex" style="gap:1.5rem">
+  <label style="white-space:nowrap">
+    <input type="radio" name="search_type" value="partial" {"checked" if st=="partial" else ""}> 部分一致
   </label>
-  <label class="form-check-label mr-2">
-    <input class="form-check-input" type="radio" name="search_type" value="exact" {"checked" if st=="exact" else ""}> 完全一致
+  <label style="white-space:nowrap">
+    <input type="radio" name="search_type" value="exact" {"checked" if st=="exact" else ""}> 完全一致
   </label>
-  <label class="form-check-label mr-2">
-    <input class="form-check-input" type="radio" name="search_type" value="prefix" {"checked" if st=="prefix" else ""}> 前方一致
+  <label style="white-space:nowrap">
+    <input type="radio" name="search_type" value="prefix" {"checked" if st=="prefix" else ""}> 前方一致
   </label>
-  <label class="form-check-label mr-2">
-    <input class="form-check-input" type="radio" name="search_type" value="suffix" {"checked" if st=="suffix" else ""}> 後方一致
+  <label style="white-space:nowrap">
+    <input type="radio" name="search_type" value="suffix" {"checked" if st=="suffix" else ""}> 後方一致
   </label>
 </div>
 <button class="btn btn-primary btn-sm">検索</button>
@@ -738,6 +738,7 @@ if db:
 (function() {{
   var ta = document.getElementById('sql_editor');
   if (!ta) return;
+  var LS_KEY = 'sqlite_admin_sql_{db}';
   var editor = CodeMirror.fromTextArea(ta, {{
     mode: 'text/x-sql',
     lineNumbers: true,
@@ -752,8 +753,21 @@ if db:
       }}
     }}
   }});
+
+  // サーバーから送られた SQL がない場合のみ localStorage から復元
+  if (!ta.value.trim()) {{
+    var saved = localStorage.getItem(LS_KEY);
+    if (saved) editor.setValue(saved);
+  }}
+
+  // 編集のたびに localStorage に保存
+  editor.on('change', function() {{
+    localStorage.setItem(LS_KEY, editor.getValue());
+  }});
+
   document.getElementById('sql_form').addEventListener('submit', function() {{
     editor.save();
+    localStorage.setItem(LS_KEY, editor.getValue());
   }});
 }})();
 </script>
