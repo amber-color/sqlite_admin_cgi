@@ -1,7 +1,7 @@
 #!/usr/local/bin/python3.7
 # -*- coding: utf-8 -*-
 
-import cgi, cgitb, sqlite3, os, html, csv
+import cgi, cgitb, sqlite3, os, html, csv, re
 cgitb.enable()
 
 print("Content-Type: text/html; charset=utf-8\n")
@@ -91,16 +91,62 @@ if mode == "create_db":
             new = new + ".db"
         sqlite3.connect(db_path(new)).close()
 
+create_table_error = None
+create_table_success = None
+
 if mode == "create_table" and db:
-    new_table = safe(getv("new_table"))
-    cols = []
-    for n,t in zip(form.getlist("col_name"), form.getlist("col_type")):
-        if n:
-            cols.append(f"{n} {t}")
-    if new_table and cols:
-        sqlite3.connect(db_path(db)).execute(
-            f"CREATE TABLE {new_table} ({','.join(cols)})"
-        )
+    new_table = (getv("new_table") or "").strip()
+    use_pk    = getv("use_pk") or "no"
+    pk_raw    = getv("pk_col")
+
+    col_names = [n.strip() for n in form.getlist("col_name")]
+    col_types = form.getlist("col_type")
+
+    if not new_table:
+        create_table_error = "テーブル名を入力してください"
+    elif not re.match(r'^\w+$', new_table):
+        create_table_error = "テーブル名に使用できない文字が含まれています"
+    else:
+        named_idx = [(i, n, t) for i, (n, t) in enumerate(zip(col_names, col_types)) if n]
+        if not named_idx:
+            create_table_error = "カラムを1つ以上入力してください"
+        else:
+            bad = [n for _, n, _ in named_idx if not re.match(r'^\w+$', n)]
+            if bad:
+                create_table_error = f"カラム名 '{bad[0]}' に使用できない文字が含まれています"
+            else:
+                pk_col_idx = None
+                if use_pk == "yes":
+                    try:
+                        pk_col_idx = int(pk_raw)
+                        if pk_col_idx < 0 or pk_col_idx >= len(col_names) or not col_names[pk_col_idx]:
+                            create_table_error = "主キーに選択したカラムの名前を入力してください"
+                            pk_col_idx = None
+                    except (ValueError, TypeError):
+                        create_table_error = "主キーの選択が無効です"
+                elif use_pk == "yes" and pk_raw is None:
+                    create_table_error = "主キーにするカラムを選択してください"
+
+                if not create_table_error:
+                    conn_c = sqlite3.connect(db_path(db))
+                    existing = [r[0] for r in conn_c.execute(
+                        "SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
+                    if new_table in existing:
+                        create_table_error = f"テーブル '{new_table}' は既に存在します"
+                        conn_c.close()
+                    else:
+                        col_defs = []
+                        for i, n, t in named_idx:
+                            pk = " PRIMARY KEY" if pk_col_idx is not None and i == pk_col_idx else ""
+                            col_defs.append(f'"{n}" {t}{pk}')
+                        try:
+                            conn_c.execute(f'CREATE TABLE "{new_table}" ({",".join(col_defs)})')
+                            conn_c.commit()
+                            create_table_success = f"テーブル '{new_table}' を作成しました"
+                        except Exception as e:
+                            create_table_error = str(e)
+                        finally:
+                            conn_c.close()
 
 if mode == "insert" and db and table:
     conn = sqlite3.connect(db_path(db))
@@ -275,21 +321,34 @@ print(f"""
 <div id="create" class="tab-pane fade {'show active' if tab=='create' else ''}">
 
 <h5>テーブル作成</h5>
-<form>
+{"<div class='alert alert-danger py-1'>" + html.escape(create_table_error) + "</div>" if create_table_error else ""}
+{"<div class='alert alert-success py-1'>" + html.escape(create_table_success) + "</div>" if create_table_success else ""}
+<form id="create_table_form" method="get">
 <input type=hidden name=mode value=create_table>
 <input type=hidden name=db value="{db or ''}">
 <input name=new_table class="form-control mb-2" placeholder="テーブル名">
+
+<div class="mb-2">
+  主キー:
+  <div class="form-check form-check-inline">
+    <input class="form-check-input" type="radio" name="use_pk" id="pk_no" value="no" checked>
+    <label class="form-check-label" for="pk_no">なし</label>
+  </div>
+  <div class="form-check form-check-inline">
+    <input class="form-check-input" type="radio" name="use_pk" id="pk_yes" value="yes">
+    <label class="form-check-label" for="pk_yes">あり</label>
+  </div>
+</div>
 
 <div id="col_rows">
   <div class="d-flex align-items-center mb-1">
     <input name=col_name class="form-control form-control-sm mr-1" placeholder="カラム名" style="width:160px">
     <select name=col_type class="form-control form-control-sm mr-1" style="width:110px">
-      <option>TEXT</option>
-      <option>INTEGER</option>
-      <option>REAL</option>
-      <option>BLOB</option>
-      <option>NULL</option>
+      <option>TEXT</option><option>INTEGER</option><option>REAL</option><option>BLOB</option><option>NULL</option>
     </select>
+    <div class="pk-cell mr-2" style="display:none">
+      <input type="radio" name="pk_col" value="0" class="pk-radio"> <small class="text-muted">PK</small>
+    </div>
     <button type="button" class="btn btn-outline-danger btn-sm col-remove">✕</button>
   </div>
 </div>
@@ -298,24 +357,77 @@ print(f"""
 </form>
 
 <script>
-var colTemplate = '<div class="d-flex align-items-center mb-1">'
-  + '<input name=col_name class="form-control form-control-sm mr-1" placeholder="カラム名" style="width:160px">'
-  + '<select name=col_type class="form-control form-control-sm mr-1" style="width:110px">'
-  + '<option>TEXT</option><option>INTEGER</option><option>REAL</option><option>BLOB</option><option>NULL</option>'
-  + '</select>'
-  + '<button type="button" class="btn btn-outline-danger btn-sm col-remove">✕</button>'
-  + '</div>';
+function pkVisible() {{
+  var show = document.querySelector('[name=use_pk]:checked').value === 'yes';
+  document.querySelectorAll('.pk-cell').forEach(function(el) {{
+    el.style.display = show ? '' : 'none';
+  }});
+  if (!show) document.querySelectorAll('.pk-radio').forEach(function(r) {{ r.checked = false; }});
+}}
+document.querySelectorAll('[name=use_pk]').forEach(function(r) {{ r.onchange = pkVisible; }});
+
+function reindexPK() {{
+  document.querySelectorAll('#col_rows > div').forEach(function(row, i) {{
+    row.querySelector('.pk-radio').value = i;
+  }});
+}}
+
+function newRow(idx) {{
+  var show = document.querySelector('[name=use_pk]:checked').value === 'yes';
+  var d = document.createElement('div');
+  d.className = 'd-flex align-items-center mb-1';
+  d.innerHTML =
+    '<input name=col_name class="form-control form-control-sm mr-1" placeholder="カラム名" style="width:160px">'
+    + '<select name=col_type class="form-control form-control-sm mr-1" style="width:110px">'
+    + '<option>TEXT</option><option>INTEGER</option><option>REAL</option><option>BLOB</option><option>NULL</option>'
+    + '</select>'
+    + '<div class="pk-cell mr-2" style="' + (show ? '' : 'display:none') + '">'
+    + '<input type="radio" name="pk_col" value="' + idx + '" class="pk-radio"> <small class="text-muted">PK</small></div>'
+    + '<button type="button" class="btn btn-outline-danger btn-sm col-remove">✕</button>';
+  return d;
+}}
+
 document.getElementById('col_add').onclick = function() {{
-  var div = document.createElement('div');
-  div.innerHTML = colTemplate;
-  document.getElementById('col_rows').appendChild(div.firstChild);
+  var idx = document.querySelectorAll('#col_rows > div').length;
+  document.getElementById('col_rows').appendChild(newRow(idx));
 }};
+
 document.getElementById('col_rows').addEventListener('click', function(e) {{
   if (e.target.classList.contains('col-remove')) {{
-    var rows = document.querySelectorAll('#col_rows > div');
-    if (rows.length > 1) e.target.closest('div').remove();
+    if (document.querySelectorAll('#col_rows > div').length > 1) {{
+      e.target.closest('div').remove();
+      reindexPK();
+    }}
   }}
 }});
+
+document.getElementById('create_table_form').onsubmit = function(e) {{
+  var tname = this.querySelector('[name=new_table]').value.trim();
+  if (!tname) {{ alert('テーブル名を入力してください'); e.preventDefault(); return; }}
+  if (!/^\w+$/.test(tname)) {{
+    alert('テーブル名に使用できない文字が含まれています');
+    e.preventDefault(); return;
+  }}
+  var allCols = Array.from(this.querySelectorAll('[name=col_name]'));
+  var filled = allCols.filter(function(i) {{ return i.value.trim() !== ''; }});
+  if (filled.length === 0) {{ alert('カラムを1つ以上入力してください'); e.preventDefault(); return; }}
+  for (var i = 0; i < filled.length; i++) {{
+    if (!/^\w+$/.test(filled[i].value.trim())) {{
+      alert('カラム名「' + filled[i].value.trim() + '」に使用できない文字が含まれています');
+      e.preventDefault(); return;
+    }}
+  }}
+  if (document.querySelector('[name=use_pk]:checked').value === 'yes') {{
+    if (!document.querySelector('[name=pk_col]:checked')) {{
+      alert('主キーにするカラムを選択してください'); e.preventDefault(); return;
+    }}
+    var pkIdx = parseInt(document.querySelector('[name=pk_col]:checked').value);
+    var pkRow = document.querySelectorAll('#col_rows > div')[pkIdx];
+    if (!pkRow.querySelector('[name=col_name]').value.trim()) {{
+      alert('主キーに選択したカラムの名前を入力してください'); e.preventDefault(); return;
+    }}
+  }}
+}};
 </script>
 """)
 
